@@ -2,6 +2,23 @@
 
 **Keep the same local Claude Code session list when switching between your Claude accounts on one Mac.**
 
+## Start here — quick setup
+
+**Mac only. Requires Python 3.9+; the launcher checks for it.**
+
+1. **Download:** [Download the ZIP](https://github.com/gtarun/My-Shared-Claude/archive/refs/heads/main.zip), then double-click it to extract. Keep the extracted files together.
+2. **Open your accounts:** In Claude Desktop, sign into each account/organization you want included and open the **Code** tab once in each.
+3. **Quit Claude:** Finish running tasks, then press **Command + Q**.
+4. **Run setup:** Double-click **Claude Session Sharing.command** in the extracted folder. Press **Enter**, review the preview, type **SHARE**, and press Enter again.
+5. **Check:** Reopen Claude → **Code**. Open an older conversation, then switch accounts to check it there too.
+6. **Show folders:** In each account, choose **Group and sort → Group by → Folder** if you prefer project folders instead of Recents.
+
+**Done.** Switch normally between linked accounts. For a new account later, repeat steps 2–4. To undo, quit Claude, open the launcher, and choose **3**.
+
+This combines all detected local Code account folders on your Mac. Ordinary chats, cloud sessions, and connector logins remain separate. If Python is missing, [install it from python.org](https://www.python.org/downloads/macos/) or ask IT, then retry. For other issues, see [Troubleshooting](#troubleshooting).
+
+## More detail
+
 For example, you can start a local Code conversation while signed into your personal account, switch to your work account, and still find that conversation in the Code sidebar.
 
 You do not need to understand programming, Git, or Python to use the launcher. Follow the setup steps below. Python does need to be installed so the launcher can run its helper.
@@ -43,7 +60,7 @@ The goal is to share your **local Code workspace**, not to make separate Claude 
 
 If a teammate gave you `Claude-Session-Sharing-macOS.zip`, double-click the ZIP in Finder to extract it.
 
-Alternatively, download the source from this GitHub repository using **Code → Download ZIP**, then double-click the downloaded ZIP to extract it. This option is available once the repository files have been published to GitHub.
+Alternatively, download the source from this GitHub repository using **Code → Download ZIP**, then double-click the downloaded ZIP to extract it.
 
 Open the extracted folder. These files must stay together:
 
