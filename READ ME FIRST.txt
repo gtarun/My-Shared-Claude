@@ -1,0 +1,79 @@
+CLAUDE DESKTOP — LOCAL CODE SESSION SHARING (macOS)
+
+Each teammate runs this on their own Mac to share local Code sessions between
+their own Claude accounts. This does NOT synchronize conversations between
+teammates, computers, or Claude cloud accounts.
+
+QUICK START
+1. Extract the whole ZIP. Keep its three files together.
+2. In Claude Desktop, sign in to each account/organization you want to use.
+   Open the Code tab once in each so its session folder is created.
+3. Finish any running tasks and quit Claude completely with Cmd+Q.
+4. Double-click "Claude Session Sharing.command".
+5. Press Enter for setup. Review the preview, type SHARE, and press Enter.
+6. Reopen Claude. Existing accounts now use the same local Code session list.
+
+If macOS asks which app should open the .command file, choose Terminal.
+If opening it is blocked, review the files first and use your organization's
+approved way to run local scripts; do not disable system security settings.
+Python 3.9+ is required. If it is missing, install it from python.org or ask IT.
+No administrator password or extra Python packages are needed.
+
+FOLDERS NOT VISIBLE?
+In the Code sidebar choose Group and sort > Group by > Folder.
+The sidebar grouping preference is separate for each account/organization.
+
+WHAT IT DOES
+It merges local Code session records from the account folders already present
+on this Mac into one shared directory, then links those account folders to it.
+Future local sessions and session updates use that same directory. Local Code
+settings, skills, agents, plugins and project memory continue using their
+existing shared files. Login storage is not copied or linked.
+
+It preserves original per-account folders in timestamped local backups.
+It removes old account-bound Remote Control/bridge references and remote MCP
+connector definitions from newly imported session copies. Reconnect services
+under the intended account when needed. It does not send test prompts or
+modify project files.
+
+LIMITS
+This is a custom workaround, verified on Claude Desktop 4.4212.0. A later
+Desktop update may need a compatibility check. Use one active Desktop login
+at a time. Ordinary Chat, Cowork, cloud sessions, saved environments,
+account-hosted customization, sidebar preferences, connector authentication,
+subscriptions, model access and organization policies remain separate.
+Existing missing transcripts cannot be recovered by merging session records.
+Duplicate session IDs use the newest file on initial setup. Once sharing is
+installed, the existing shared copy takes priority during additional setup.
+All detected local Code account/organization folders are included; use this
+only for accounts whose local conversation histories you intend to combine.
+
+ADD ANOTHER ACCOUNT LATER
+Sign in to it and open Code once, quit Claude, then run the launcher again
+and choose setup. If the sidebar is stale after switching, restart Claude.
+
+STATUS / UNDO
+Run the same launcher and choose 2 for status or 3 for undo.
+Undo requires Claude to be closed. It restores original account folders.
+The shared store remains on disk with any new sessions, but those new sessions
+are not automatically copied into restored per-account folders.
+If setup is interrupted, keep Claude closed and use Undo before trying again.
+
+FILES ON YOUR MAC
+Shared records:
+  ~/Library/Application Support/Claude/shared-code-sessions
+Backups:
+  ~/Library/Application Support/Claude/codex-session-sharing-backups
+Setup journal:
+  ~/Library/Application Support/Claude/codex-session-sharing.json
+Existing transcripts remain in their original local locations.
+
+OPTIONAL TERMINAL USAGE
+Open Terminal in the extracted folder and run one of:
+  python3 claude-session-sharing.py plan
+  python3 claude-session-sharing.py setup
+  python3 claude-session-sharing.py status
+  python3 claude-session-sharing.py undo
+
+The ZIP contains code and these instructions only. Do not distribute your
+Claude session directories, local backups, or login files with it.

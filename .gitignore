@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.venv/
+dist/
+# Never add runtime sessions, login files, or personal backups.
+.claude/
+.claude.json
+.credentials.json
+claude-code-sessions/
+shared-code-sessions/
+codex-session-sharing-backups/
+codex-session-sharing*.json
