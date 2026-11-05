@@ -1,15 +1,20 @@
-CLAUDE DESKTOP — LOCAL CODE SESSION SHARING (macOS)
+CLAUDE DESKTOP — LOCAL CODE SESSION SHARING (macOS / Windows / Linux)
 
-Each teammate runs this on their own Mac to share local Code sessions between
+Each teammate runs this on their own computer to share local Code sessions between
 their own Claude accounts. This does NOT synchronize conversations between
 teammates, computers, or Claude cloud accounts.
 
 QUICK START
-1. Extract the whole ZIP. Keep its three files together.
+1. Extract the whole ZIP. Keep all extracted files together.
 2. In Claude Desktop, sign in to each account/organization you want to use.
    Open the Code tab once in each so its session folder is created.
-3. Finish any running tasks and quit Claude completely with Cmd+Q.
-4. Double-click "Claude Session Sharing.command".
+3. Finish running tasks and quit Claude completely (Cmd+Q on Mac).
+   On Windows, also exit Claude's system-tray icon if it remains running.
+4. Open the launcher for your platform:
+   Mac: double-click "Claude Session Sharing.command".
+   Windows: double-click "Claude Session Sharing.cmd" (no administrator mode).
+   Linux: open a terminal in the folder and run:
+     bash "./Claude Session Sharing.sh"
 5. Press Enter for setup. Review the preview, type SHARE, and press Enter.
 6. Reopen Claude. Existing accounts now use the same local Code session list.
 
@@ -17,7 +22,12 @@ If macOS asks which app should open the .command file, choose Terminal.
 If opening it is blocked, review the files first and use your organization's
 approved way to run local scripts; do not disable system security settings.
 Python 3.9+ is required. If it is missing, install it from python.org or ask IT.
-No administrator password or extra Python packages are needed.
+No extra Python packages are needed. Do not run this helper as administrator
+or with sudo. Windows uses junctions; Mac/Linux use symbolic links.
+Windows/Linux support is new: native automated tests cover the filesystem
+operations, while Claude Desktop history loading must be checked on your
+own machine. Mac Desktop loading was verified on version 4.4212.0.
+See README.md for platform-specific details and data-directory discovery.
 
 FOLDERS NOT VISIBLE?
 In the Code sidebar choose Group and sort > Group by > Folder.
@@ -25,7 +35,7 @@ The sidebar grouping preference is separate for each account/organization.
 
 WHAT IT DOES
 It merges local Code session records from the account folders already present
-on this Mac into one shared directory, then links those account folders to it.
+on this computer into one shared directory, then links those account folders to it.
 Future local sessions and session updates use that same directory. Local Code
 settings, skills, agents, plugins and project memory continue using their
 existing shared files. Login storage is not copied or linked.
@@ -58,18 +68,21 @@ Undo requires Claude to be closed. It restores original account folders.
 The shared store remains on disk with any new sessions, but those new sessions
 are not automatically copied into restored per-account folders.
 If setup is interrupted, keep Claude closed and use Undo before trying again.
+If multiple stores are detected, stop and ask your maintainer to choose the
+correct one with --data-dir; see README.md.
 
-FILES ON YOUR MAC
+FILES ON YOUR COMPUTER
 Shared records:
-  ~/Library/Application Support/Claude/shared-code-sessions
+  <Claude data directory>/shared-code-sessions
 Backups:
-  ~/Library/Application Support/Claude/codex-session-sharing-backups
+  <Claude data directory>/codex-session-sharing-backups
 Setup journal:
-  ~/Library/Application Support/Claude/codex-session-sharing.json
+  <Claude data directory>/codex-session-sharing.json
 Existing transcripts remain in their original local locations.
 
 OPTIONAL TERMINAL USAGE
-Open Terminal in the extracted folder and run one of:
+Open a terminal in the extracted folder and run one of
+(on Windows, use py -3 instead of python3):
   python3 claude-session-sharing.py plan
   python3 claude-session-sharing.py setup
   python3 claude-session-sharing.py status
