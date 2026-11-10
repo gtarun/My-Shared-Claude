@@ -1,6 +1,6 @@
 ---
 title: How Claude Desktop stores Code sessions, and how I share them across accounts
-published: false
+published: true
 description: Switching Claude accounts swaps your whole Claude Code sidebar. Here's where those sessions live on disk, and a small open-source tool that links them into one shared list on Mac, Windows and Linux.
 tags: claude, productivity, opensource, python
 cover_image: https://raw.githubusercontent.com/gtarun/My-Shared-Claude/main/product-hunt-launch/gallery/01-hero.png
