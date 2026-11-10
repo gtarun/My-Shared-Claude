@@ -1,0 +1,11 @@
+Every time I switched Claude accounts, my Claude Code sessions vanished.
+
+So I fixed it.
+
+My Shared Claude gives all your accounts one session list:
+→ double-click setup
+→ preview first, undo anytime
+→ free + open source
+
+Live on Product Hunt 👇
+https://www.producthunt.com/products/my-shared-claude

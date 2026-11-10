@@ -246,6 +246,10 @@ Answer the actual question first, then add "I ran into this too and made a small
 | Show HN | | | | | |
 | r/ClaudeAI | | | | | |
 | r/ClaudeCode | | | | | |
+| X launch post | 2026-11-10 | @tarungupta003 | | | |
+| LinkedIn launch post | 2026-11-10 | | | | |
+| dev.to article | draft saved | (unpublished) | | | |
+| r/ClaudeCode weekly showcase (comment) | 2026-11-10 | https://www.reddit.com/r/ClaudeCode/comments/1xrpcjt/comment/19seyau3a992a/ | 1 | 0 | 0 |
 | Peerlist | | | | | |
 | DevHunt | | | | | |
 | dev.to | | | | | |
