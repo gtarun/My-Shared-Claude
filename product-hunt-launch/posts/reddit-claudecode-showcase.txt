@@ -1,0 +1,13 @@
+My Shared Claude: keeps one local Claude Code session list when you switch between Claude accounts/orgs in Claude Desktop.
+
+I use Claude Code with a personal and a work account on one laptop, and every switch swapped my entire Code sidebar. Desktop stores local sessions per account/org under claude-code-sessions/<account>/<org>/, so this merges them into one shared store and replaces each folder with a link (symlink on Mac/Linux, junction on Windows, no admin needed).
+
+• Double-click launchers for Mac/Windows/Linux, Python 3.9+ standard library only
+• Dry-run preview; nothing changes until you type SHARE
+• Timestamped backups + one-step Undo
+• Logins, cloud chats, connectors and org policies stay separate
+
+To be upfront: I wrote it with a different AI coding tool, but it's built for Claude Code users. Something I learned: one email login can have several org folders, so the folder count is often higher than people expect.
+
+Free and MIT licensed: https://github.com/gtarun/My-Shared-Claude
+Verified on Mac. I'd love reports from Windows/Linux users.

@@ -14,7 +14,7 @@
 
 Windows and Linux support is new. The automated checks exercise their native folder-linking and undo operations; testing a real Claude Desktop conversation is still required on your own machine. macOS Desktop history loading was verified on version 4.4212.0.
 
-1. **Download:** [Download the ZIP](https://github.com/gtarun/My-Shared-Claude/archive/refs/heads/main.zip), then extract it: double-click on Mac, **Extract All** on Windows, or **Extract** on Linux. Keep the extracted files together.
+1. **Download:** [Download the ZIP](https://github.com/gtarun/My-Shared-Claude/releases/latest/download/My-Shared-Claude-v1.0.zip), then extract it: double-click on Mac, **Extract All** on Windows, or **Extract** on Linux. Keep the extracted files together.
 2. **Open your accounts:** In Claude Desktop, sign into each account/organization you want included and open the **Code** tab once in each.
 3. **Quit Claude:** Finish running tasks, then use **Quit/Exit** in Claude. On Mac, press **Command + Q**. On Windows, also exit Claude from its system-tray icon if it is still running.
 4. **Run setup:** Open the launcher for your platform from the table above. Press **Enter**, review the preview, type **SHARE**, and press Enter again.

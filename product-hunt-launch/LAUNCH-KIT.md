@@ -41,7 +41,7 @@ Personal and work Claude accounts? Every switch hides your local Claude Code ses
 
 **Links**
 - Website: `https://github.com/gtarun/My-Shared-Claude`
-- Additional link (direct download): `https://github.com/gtarun/My-Shared-Claude/archive/refs/heads/main.zip`, or the Release URL once you've created one
+- Additional link (direct download): `https://github.com/gtarun/My-Shared-Claude/releases/latest/download/My-Shared-Claude-v1.0.zip`
 
 **Topics** (pick 3)
 `Developer Tools` · `Open Source` · `Artificial Intelligence` (alternatives: `Productivity`, `GitHub`)
