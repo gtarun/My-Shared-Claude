@@ -11,3 +11,6 @@ claude-code-sessions/
 shared-code-sessions/
 codex-session-sharing-backups/
 codex-session-sharing*.json
+
+# Local-only launch/marketing material
+product-hunt-launch/
