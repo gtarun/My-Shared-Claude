@@ -154,8 +154,33 @@ class PlatformTests(unittest.TestCase):
         self.assertEqual((target / 'retained.txt').read_text(), 'keep')
 
     def test_windows_running_app_blocks_changes(self):
-        with patch.object(self.m.sys, 'platform', 'win32'), patch.object(self.m.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '"Claude.exe","123","Console","1","10,000 K"\n', '')):
+        with patch.object(self.m.sys, 'platform', 'win32'), patch.object(self.m.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, b'"Claude.exe","123","Console","1","10,000 K"\n', b'')):
             with self.assertRaises(SystemExit):
+                self.m.require_closed()
+
+    def test_windows_localized_no_match_output_with_utf8_mode(self):
+        # Use a real pipe with OEM-encoded output, as tasklist can produce.
+        # The Windows launcher sets PYTHONUTF8=1, so strict text decoding fails.
+        run = subprocess.run
+        def localized_tasklist(*args, **kwargs):
+            return run([sys.executable, '-c', r"import sys; sys.stdout.buffer.write(b'Informazioni: nessuna attivit\x85 in esecuzione.\r\n')"], **kwargs)
+        with patch.object(self.m.sys, 'platform', 'win32'), patch.object(self.m.subprocess, 'run', side_effect=localized_tasklist):
+            self.m.require_closed()
+
+    def test_windows_non_utf8_columns_do_not_hide_running_app(self):
+        output = b'"CLAUDE.EXE","123","attivit\x85","1","10,000 K"\r\n'
+        with patch.object(self.m.sys, 'platform', 'win32'), patch.object(self.m.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, output, b'')):
+            with self.assertRaisesRegex(SystemExit, 'Quit Claude'):
+                self.m.require_closed()
+
+    def test_windows_failed_process_check_blocks_changes(self):
+        with patch.object(self.m.sys, 'platform', 'win32'), patch.object(self.m.subprocess, 'run', return_value=subprocess.CompletedProcess([], 1, b'', b'access denied')):
+            with self.assertRaisesRegex(SystemExit, 'Could not check'):
+                self.m.require_closed()
+
+    def test_windows_missing_process_output_blocks_changes(self):
+        with patch.object(self.m.sys, 'platform', 'win32'), patch.object(self.m.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, None, b'')):
+            with self.assertRaisesRegex(SystemExit, 'Could not check'):
                 self.m.require_closed()
 
     def test_failed_process_check_blocks_changes(self):
