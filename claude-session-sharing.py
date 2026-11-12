@@ -137,10 +137,14 @@ def clean(record):
 
 def require_closed():
     if sys.platform == 'win32':
-        result = subprocess.run(['tasklist.exe', '/FI', 'IMAGENAME eq Claude.exe', '/FO', 'CSV', '/NH'], capture_output=True, text=True)
-        if result.returncode != 0:
+        # tasklist can emit a Windows code page even when PYTHONUTF8=1.
+        # Capture bytes so decoding cannot fail in subprocess's reader thread.
+        result = subprocess.run(['tasklist.exe', '/FI', 'IMAGENAME eq Claude.exe', '/FO', 'CSV', '/NH'], capture_output=True)
+        if result.returncode != 0 or result.stdout is None:
             raise SystemExit('Could not check whether Claude is running. No changes made.')
-        running = any(row and row[0].casefold() == 'claude.exe' for row in csv.reader(result.stdout.splitlines()))
+        # Only the ASCII image name Claude.exe is compared; localized text is ignored.
+        output = result.stdout.decode('utf-8', errors='replace')
+        running = any(row and row[0].casefold() == 'claude.exe' for row in csv.reader(output.splitlines()))
     else:
         # Include the official Linux launcher name; conservatively include the CLI.
         result = subprocess.run(['pgrep', '-u', str(os.getuid()), '-ix', 'Claude|claude-desktop'], capture_output=True, text=True)
