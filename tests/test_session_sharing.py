@@ -1,4 +1,6 @@
 import contextlib
+import os
+import base64
 import importlib.util
 import io
 import json
@@ -11,6 +13,15 @@ from pathlib import Path
 from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'claude-session-sharing.py'
+
+
+def create_legacy_link(path, target):
+    if sys.platform == 'win32':
+        quote = lambda p: "'" + str(p).replace("'", "''") + "'"
+        code = "$ErrorActionPreference='Stop'; New-Item -ItemType Junction -Path " + quote(path) + ' -Value ' + quote(target) + ' | Out-Null'
+        subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-EncodedCommand', base64.b64encode(code.encode('utf-16-le')).decode()], check=True, capture_output=True)
+    else:
+        path.symlink_to(target, target_is_directory=True)
 
 class SharingTests(unittest.TestCase):
     def setUp(self):
@@ -76,39 +87,92 @@ class SharingTests(unittest.TestCase):
         self.assertTrue(a.is_dir())
         self.assertFalse(self.m.is_link(a))
 
-    def test_merge_live_writes_enroll_and_rollback(self):
+    def test_sync_keeps_native_directories_and_copies_only_when_run(self):
         a, b = self.folder(), self.folder()
-        original = self.record(a, bridgeSessionIds=['account-bound'], remoteMcpServersConfig=['account-bound'])
+        original = self.record(a, bridgeSessionIds=['old-account'])
         self.record(b)
         self.m.setup()
-        self.assertEqual(len(list(self.m.SHARED.glob('local_*.json'))), 2)
-        d = json.loads((a / original.name).read_text())
-        self.assertNotIn('bridgeSessionIds', d)
-        self.assertNotIn('remoteMcpServersConfig', d)
-        self.assertEqual(a.resolve(), b.resolve())
+        self.assertFalse(self.m.is_link(a))
+        self.assertFalse(self.m.is_link(b))
+        self.assertNotEqual(a.resolve(), b.resolve())
+        if hasattr(os, 'O_NOFOLLOW') and hasattr(os, 'O_DIRECTORY'):
+            for folder in [a, b]:
+                fd = os.open(folder, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                os.close(fd)
+        self.assertNotIn('bridgeSessionIds', json.loads((b / original.name).read_text()))
         new = self.record(a)
-        self.assertTrue((b / new.name).exists())
-        c = self.folder()
-        self.record(c)
+        self.assertFalse((b / new.name).exists())
         self.m.setup()
-        self.assertEqual(c.resolve(), a.resolve())
-        self.assertEqual(len(list(self.m.SHARED.glob('local_*.json'))), 4)
-        self.m.setup()  # idempotent
+        self.assertTrue((b / new.name).exists())
+        self.assertEqual(len(list(b.glob('local_*.json'))), 3)
+
+    def test_sync_picks_newest_native_edit_and_preserves_source_credentials(self):
+        a, b = self.folder(), self.folder()
+        source = self.record(a, remoteMcpServersConfig=['keep-on-origin'])
+        self.m.setup()
+        data = json.loads(source.read_text())
+        data['title'] = 'Updated in Claude'
+        replacement = source.with_suffix('.new')
+        replacement.write_text(json.dumps(data))
+        os.replace(replacement, source)
+        os.utime(source, ns=(source.stat().st_atime_ns, source.stat().st_mtime_ns + 1000000000))
+        self.m.setup()
+        self.assertEqual(json.loads((b / source.name).read_text())['title'], 'Updated in Claude')
+        self.assertEqual(json.loads(source.read_text())['remoteMcpServersConfig'], ['keep-on-origin'])
+
+    def test_legacy_link_is_materialized_and_undo_never_recreates_it(self):
+        a, b = self.folder(), self.folder()
+        self.m.SHARED.mkdir()
+        saved = self.record(self.m.SHARED)
+        a.rmdir()
+        create_legacy_link(a, self.m.SHARED)
+        self.m.setup()
+        self.assertFalse(self.m.is_link(a))
+        self.assertTrue((a / saved.name).exists())
+        self.assertTrue((b / saved.name).exists())
         self.m.undo()
         self.assertFalse(self.m.is_link(a))
-        self.assertEqual(len(list(a.glob('local_*.json'))), 1)
-        self.assertTrue((self.m.SHARED / new.name).exists())
-        self.assertFalse(self.m.STATE.exists())
+        self.assertTrue((a / saved.name).exists())
+        self.assertTrue(saved.exists())
 
-    def test_interrupted_link_creation_can_be_undone(self):
-        a = self.folder()
+    def test_failed_sync_is_recoverable_without_losing_user_records(self):
+        a, b = self.folder(), self.folder()
         source = self.record(a)
-        with patch.object(self.m, 'create_directory_link', side_effect=OSError('simulated interruption')):
+        self.record(b)
+        with patch.object(self.m, 'replace_folder', side_effect=OSError('simulated interruption')):
             with self.assertRaises(OSError):
                 self.m.setup()
         self.m.undo()
         self.assertTrue(source.exists())
         self.assertFalse(self.m.is_link(a))
+
+    def test_undo_preserves_changes_made_after_sync_in_backup(self):
+        a, b = self.folder(), self.folder()
+        self.record(a)
+        self.m.setup()
+        new = self.record(a)
+        self.m.undo()
+        self.assertFalse(self.m.is_link(a))
+        self.assertTrue(any(p.name == new.name for p in (self.m.BASE / 'codex-session-sharing-backups').rglob(new.name)))
+
+    def test_recovery_reads_transcript_metadata_without_modifying_messages(self):
+        a = self.folder()
+        self.record(a)
+        transcript = Path(self.temp.name) / (str(uuid.uuid4()) + '.jsonl')
+        content = '\n'.join(json.dumps(d) for d in [
+            {'type': 'user', 'cwd': str(Path(self.temp.name)), 'timestamp': '2026-11-12T08:00:00Z', 'message': {'content': 'private'}},
+            {'type': 'custom-title', 'customTitle': 'Recovered design'},
+            {'type': 'assistant', 'timestamp': '2026-11-12T09:00:00Z', 'message': {'content': 'private response'}},
+        ]) + '\n'
+        transcript.write_text(content)
+        self.assertTrue(callable(getattr(self.m, 'recover_transcripts', None)), 'Transcript recovery is missing')
+        self.m.recover_transcripts([transcript])
+        files = list(a.glob('local_*.json'))
+        recovered = [json.loads(p.read_text()) for p in files if json.loads(p.read_text()).get('cliSessionId') == transcript.stem]
+        self.assertEqual(len(recovered), 1)
+        self.assertEqual(recovered[0]['title'], 'Recovered design')
+        self.assertEqual(transcript.read_text(), content)
+        self.assertEqual(recovered[0]['permissionMode'], 'default')
 
 class PlatformTests(unittest.TestCase):
     def setUp(self):
@@ -142,17 +206,6 @@ class PlatformTests(unittest.TestCase):
                 self.m.select_base()
         self.assertEqual(self.m.select_base(first), first.resolve())
 
-    def test_directory_link_writes_and_removal_preserve_target(self):
-        self.assertTrue(callable(getattr(self.m, 'create_directory_link', None)), 'Portable linking is missing')
-        target, link = self.home / 'target', self.home / 'link'
-        target.mkdir()
-        self.m.create_directory_link(link, target)
-        self.assertTrue(self.m.is_link(link))
-        (link / 'retained.txt').write_text('keep')
-        self.m.remove_directory_link(link)
-        self.assertFalse(link.exists())
-        self.assertEqual((target / 'retained.txt').read_text(), 'keep')
-
     def test_windows_running_app_blocks_changes(self):
         with patch.object(self.m.sys, 'platform', 'win32'), patch.object(self.m.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '"Claude.exe","123","Console","1","10,000 K"\n', '')):
             with self.assertRaises(SystemExit):
@@ -174,7 +227,7 @@ class LauncherTests(unittest.TestCase):
             command = ['zsh', str(repo / 'Claude Session Sharing.command')]
         result = subprocess.run(command, input='4\n', capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('Set up / add accounts', result.stdout)
+        self.assertIn('Sync / repair old setup', result.stdout)
 
 if __name__ == '__main__':
     unittest.main()

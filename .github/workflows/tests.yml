@@ -21,5 +21,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - name: Test sharing and native folder links
+      - name: Test offline sync, recovery and native directories
         run: python -m unittest discover -s tests -v

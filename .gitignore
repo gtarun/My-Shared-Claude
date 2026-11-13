@@ -14,3 +14,5 @@ codex-session-sharing*.json
 
 # Local-only launch/marketing material
 product-hunt-launch/
+session-sharing-recovery-backups/
+*.jsonl

@@ -1,92 +1,63 @@
-CLAUDE DESKTOP — LOCAL CODE SESSION SHARING (macOS / Windows / Linux)
+CLAUDE DESKTOP - OFFLINE CODE SESSION SYNC (Mac / Windows / Linux)
 
-Each teammate runs this on their own computer to share local Code sessions between
-their own Claude accounts. This does NOT synchronize conversations between
-teammates, computers, or Claude cloud accounts.
+IMPORTANT: REPLACES THE OLD FOLDER-LINKING VERSION
+Old linked account folders could let history open while preventing Claude from
+saving recent sidebar entries. Download this version and run Sync/repair with
+Claude closed. It replaces recognized links with NORMAL folders and saves
+backups. Missing sidebar entries may need recovery from existing transcripts;
+ask the maintainer and see README.md. Do not delete transcript files.
 
-QUICK START
-1. Extract the whole ZIP. Keep all extracted files together.
-2. In Claude Desktop, sign in to each account/organization you want to use.
-   Open the Code tab once in each so its session folder is created.
-3. Finish running tasks and quit Claude completely (Cmd+Q on Mac).
-   On Windows, also exit Claude's system-tray icon if it remains running.
-4. Open the launcher for your platform:
-   Mac: double-click "Claude Session Sharing.command".
-   Windows: double-click "Claude Session Sharing.cmd" (no administrator mode).
-   Linux: open a terminal in the folder and run:
+QUICK STEPS
+1. Extract the whole ZIP and replace old downloaded copies.
+2. In Desktop, sign into each intended account/organization and open Code once.
+3. Finish your work and QUIT CLAUDE COMPLETELY (Cmd+Q on Mac; also quit the
+   system-tray icon on Windows if it remains running).
+4. Open the matching launcher:
+   Mac: double-click Claude Session Sharing.command
+   Windows: double-click Claude Session Sharing.cmd
+   Linux: open a terminal in this folder and run:
      bash "./Claude Session Sharing.sh"
-5. Press Enter for setup. Review the preview, type SHARE, and press Enter.
-6. Reopen Claude. Existing accounts now use the same local Code session list.
+5. Press Enter for Sync / repair old setup. Read the preview, type SYNC,
+   and press Enter. Keep Claude closed until success.
+6. Reopen Claude > Code and open a familiar conversation to check its history.
+7. To show folders: Group and sort > Group by > Folder (once per organization).
 
-If macOS asks which app should open the .command file, choose Terminal.
-If opening it is blocked, review the files first and use your organization's
-approved way to run local scripts; do not disable system security settings.
-Python 3.9+ is required. If it is missing, install it from python.org or ask IT.
-No extra Python packages are needed. Do not run this helper as administrator
-or with sudo. Windows uses junctions; Mac/Linux use symbolic links.
-Windows/Linux support is new: native automated tests cover the filesystem
-operations, while Claude Desktop history loading must be checked on your
-own machine. Mac Desktop loading was verified on version 4.4212.0.
-See README.md for platform-specific details and data-directory discovery.
+BEFORE EVERY ACCOUNT SWITCH
+Finish work > quit Claude > run Sync > reopen Claude > switch accounts.
+New conversations are NOT copied automatically while the app is running.
+This is local copying between your OWN accounts on one computer, not sync
+between teammates, computers, or Claude cloud accounts.
 
-FOLDERS NOT VISIBLE?
-In the Code sidebar choose Group and sort > Group by > Folder.
-The sidebar grouping preference is separate for each account/organization.
-
-WHAT IT DOES
-It merges local Code session records from the account folders already present
-on this computer into one shared directory, then links those account folders to it.
-Future local sessions and session updates use that same directory. Local Code
-settings, skills, agents, plugins and project memory continue using their
-existing shared files. Login storage is not copied or linked.
-
-It preserves original per-account folders in timestamped local backups.
-It removes old account-bound Remote Control/bridge references and remote MCP
-connector definitions from newly imported session copies. Reconnect services
-under the intended account when needed. It does not send test prompts or
-modify project files.
-
-LIMITS
-This is a custom workaround, verified on Claude Desktop 4.4212.0. A later
-Desktop update may need a compatibility check. Use one active Desktop login
-at a time. Ordinary Chat, Cowork, cloud sessions, saved environments,
-account-hosted customization, sidebar preferences, connector authentication,
-subscriptions, model access and organization policies remain separate.
-Existing missing transcripts cannot be recovered by merging session records.
-Duplicate session IDs use the newest file on initial setup. Once sharing is
-installed, the existing shared copy takes priority during additional setup.
-All detected local Code account/organization folders are included; use this
-only for accounts whose local conversation histories you intend to combine.
-
-ADD ANOTHER ACCOUNT LATER
-Sign in to it and open Code once, quit Claude, then run the launcher again
-and choose setup. If the sidebar is stale after switching, restart Claude.
+REQUIREMENTS
+Python 3.9+. The launcher checks for Python; install from python.org or ask IT
+if missing. Keep the helper and launchers together. No extra Python packages.
+Use your normal user account; do not run as administrator or with sudo.
+If scripts are blocked by your company, ask IT. Do not disable protections.
 
 STATUS / UNDO
-Run the same launcher and choose 2 for status or 3 for undo.
-Undo requires Claude to be closed. It restores original account folders.
-The shared store remains on disk with any new sessions, but those new sessions
-are not automatically copied into restored per-account folders.
-If setup is interrupted, keep Claude closed and use Undo before trying again.
-If multiple stores are detected, stop and ask your maintainer to choose the
-correct one with --data-dir; see README.md.
+Option 2 reports normal folders, legacy links, and the last sync status.
+Option 3 restores the last pre-sync account snapshots. Type UNDO to confirm.
+Current files are backed up again before restoring, so later records remain
+preserved there. Undo never restores account-folder links. Original transcript
+contents are not changed. If interrupted, keep Claude closed and run Undo.
 
-FILES ON YOUR COMPUTER
-Shared records:
-  <Claude data directory>/shared-code-sessions
-Backups:
-  <Claude data directory>/codex-session-sharing-backups
-Setup journal:
-  <Claude data directory>/codex-session-sharing.json
-Existing transcripts remain in their original local locations.
+LIMITS
+All detected account folders in the selected native Desktop store are included.
+Logins, cloud chats, Cowork, saved environments, sidebar layout, subscriptions,
+organization restrictions, and connector authentication remain separate.
+Imported records discard account-bound Remote Control/connector references;
+reconnect those services under the intended account. Existing missing
+transcripts cannot be reconstructed. Newest file modification time wins when
+records conflict; pre-sync variants are retained in each run's backup.
+Deletions are not propagated and may be copied back; archive sessions instead.
+Use one active Desktop login and run one sync operation at a time.
 
-OPTIONAL TERMINAL USAGE
-Open a terminal in the extracted folder and run one of
-(on Windows, use py -3 instead of python3):
-  python3 claude-session-sharing.py plan
-  python3 claude-session-sharing.py setup
-  python3 claude-session-sharing.py status
-  python3 claude-session-sharing.py undo
+BACKUPS AND PRIVATE DATA
+The printed backup path is under the native Claude data directory:
+  codex-session-sharing-backups/offline-<timestamp>/
+Account folders remain under claude-code-sessions; shared-code-sessions is
+only an archive from the last sync. Keep backups and transcript files private.
+Do not distribute them with this package. No credentials are included here.
 
-The ZIP contains code and these instructions only. Do not distribute your
-Claude session directories, local backups, or login files with it.
+For detailed steps, custom data directories, recovery commands, troubleshooting,
+and compatibility limits, read README.md.
