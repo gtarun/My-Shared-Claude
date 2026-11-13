@@ -21,7 +21,9 @@
 5. **Reopen Claude → Code:** older local sessions should be listed. Open a familiar one to check its history.
 6. **For project folders:** choose **Group and sort → Group by → Folder** once in each account/organization.
 
-**Before every later account switch: finish work → quit Claude → run Sync → reopen Claude → switch accounts.** This version copies files; it does not keep accounts synchronized while Claude is running.
+**Mac users can now make this automatic:** open the launcher, choose **5. Enable automatic sync on quit**, and do that once. Afterward: **finish work → fully quit Claude → leave it closed about 5–10 seconds → reopen → switch accounts**. No manual Sync is needed when the watcher finishes successfully. Switching accounts inside an open app does not trigger it. If you reopen before the five-second quiet period ends, it defers copying until a later full quit.
+
+**Manual mode (all platforms):** finish work → quit Claude → run Sync → reopen → switch accounts. Both modes copy files only while Claude is closed; neither is live in-app sharing. See [Automatic sync on Mac](#automatic-sync-on-mac).
 
 The tool combines all detected local Code account folders in one native Desktop data directory on this computer. It does not copy conversations to teammates’ computers or merge cloud accounts. If Python is missing, install it from [python.org](https://www.python.org/downloads/) or ask IT. See [Troubleshooting](#troubleshooting) for help.
 
@@ -29,7 +31,7 @@ The tool combines all detected local Code account folders in one native Desktop 
 
 The original version pointed several account folders at one shared directory using symbolic links or Windows junctions. An operating-system link test passed, and existing conversations could be read, but Claude Desktop’s private-directory safeguards could reject writes through those links. This left some newer conversations with transcripts on disk but no saved sidebar entry.
 
-The current version creates **no account-folder links**. Each account has a normal, independent directory that Claude can write to. The tool copies session records between those directories only when Claude is fully closed. It does not patch Claude, disable its safeguards, or install a background service.
+The current version creates **no account-folder links**. Each account has a normal, independent directory that Claude can write to. The tool copies session records between those directories only when Claude is fully closed. It does not patch Claude or disable its safeguards. Manual mode installs no background service; the optional Mac quit watcher uses a user-level LaunchAgent.
 
 On first use after the old version, Sync also repairs recognized linked folders. Undo never restores the faulty links.
 
@@ -55,7 +57,7 @@ Compatibility depends on Claude’s storage layout. Automated checks cover nativ
 | Remote Control and connectors | Account-bound references are removed from imported copies; reconnect them under the intended account if needed. The source account’s own settings are retained when its record is unchanged. |
 | Organization policies and model access | Still depend on the active account. |
 
-This is **manual local copying**, not automatic sharing or cloud synchronization. Use one active Desktop login at a time.
+This is **local copying while Desktop is closed**, not live in-app sharing or cloud synchronization. Mac users can opt into a quit-triggered watcher; Windows/Linux remain manual. Use one active Desktop login at a time.
 
 ## Detailed setup without programming
 
@@ -103,6 +105,9 @@ You will see:
 2. Check status
 3. Undo last sync
 4. Exit
+5. Enable automatic sync on quit (Mac)
+6. Automatic sync status (Mac)
+7. Disable automatic sync (Mac)
 ```
 
 Press Enter for option 1. The preview changes nothing. It reports the folders, distinct records, and legacy links to repair. Type **SYNC** to apply; pressing Enter without that word cancels. Keep Claude closed until the success message appears.
@@ -115,7 +120,33 @@ Reopen Claude, open Code, and find a familiar conversation. Open it without send
 
 For folders instead of one long Recents list, choose **Group and sort → Group by → Folder**. This preference is separate for each account/organization.
 
+## Automatic sync on Mac
+
+After repairing/setup with the current files, open the launcher and choose **5. Enable automatic sync on quit**. It installs a background watcher for your normal Mac user; no administrator password is required. It starts now and at future logins. Existing sessions and login files are not changed by installing it.
+
+The watcher:
+
+- Waits until all Claude processes exit, then waits five more seconds.
+- Runs the same backup-and-copy sync when session records changed.
+- Skips unchanged data, so an unchanged quit creates no new sync backup.
+- Rechecks that Claude is closed before applying the prepared copies.
+- Defers if the app reopens before the quiet period ends; it tries again after a later quit.
+- Uses an operating-system lock so a manual sync, automatic sync, or recovery cannot write at the same time.
+- Retains the existing normal account folders and never introduces folder links.
+
+**Give it about 5–10 seconds after quitting before reopening.** Simply closing a window, switching an organization inside the running app, or leaving Claude CLI processes open may not count as a full quit. If you reopen too quickly, use manual Sync after closing again or wait for the next full quit. A script cannot guarantee the newly selected account sees a completed sync if Desktop is reopened before copying finishes.
+
+For the last result and any error, open the launcher and choose **6. Automatic sync status**. If an interrupted operation needs Undo, the status reports the error rather than silently discarding data. Changed exits retain timestamped backups; they are not automatically deleted.
+
+Choose **7. Disable automatic sync** to stop it and remove its login registration. Your sessions, transcripts, backups, and logs remain. Disabling does not undo the last completed sync. **Disable the watcher before using Undo if you want future quits to stop copying.**
+
+The watcher runs a stable installed copy, so moving/deleting the downloaded ZIP folder does not break it. After updating the downloaded helper, run option 5 again to update the installed copy. The watcher does not fetch code or update itself from the internet.
+
+Automatic installation is currently **Mac only**. Windows and Linux users keep the manual Sync workflow.
+
 ## Switching accounts later
+
+If the Mac watcher is enabled, fully quit Claude, wait about 5–10 seconds, then reopen and switch. Use option 6 to check the result. Otherwise, follow the manual steps:
 
 1. Finish your current work.
 2. Quit Claude fully.
@@ -123,7 +154,7 @@ For folders instead of one long Recents list, choose **Group and sort → Group 
 4. Reopen Claude and switch to the other account.
 5. Open Code and check the copied session.
 
-If you add a new account/organization, open Code in it once, quit, and run Sync again to include it. Merely switching accounts does not trigger copying. Do not run two sync operations at the same time.
+If you add a new account/organization, open Code in it once, quit, and run Sync again to include it. Merely switching accounts does not trigger copying; the Mac watcher triggers only after a full quit. Do not run two sync operations at the same time.
 
 Sync is additive: it does not propagate deletion. A deleted entry may be copied back from another account or the archive. Archive a conversation instead when you want it out of your active list.
 
@@ -144,6 +175,8 @@ Open the launcher and choose **2**. It reports normal and legacy-linked account 
 If a previous sync was interrupted, keep Claude closed and use Undo before running another sync.
 
 ## Undo the last sync
+
+If automatic sync is enabled, disable it with option 7 first when you want to stop future copying.
 
 1. Quit Claude completely.
 2. Open the launcher and choose **3**.
@@ -221,7 +254,14 @@ Inside the selected data directory:
 | `codex-session-sharing-backups/offline-<timestamp>/` | Pre-sync account snapshots, archive snapshot, manifest, replaced folders, and any explicitly recovered transcripts. |
 | `codex-session-sharing.json` | Local operation journal, using the legacy filename for compatibility. |
 
-The helper does not edit login files, project files, settings files, or transcript contents. It does not download software, contact GitHub, send messages, or install a background service. Existing session and backup files remain private local data. Never commit them to this repository.
+The helper does not edit login files, project files, settings files, or transcript contents. It does not download software, contact GitHub, or send messages. Manual mode installs no background service. The opt-in Mac watcher installs:
+
+- `~/Library/LaunchAgents/com.mysharedclaude.autosync.plist` — login/background registration.
+- `~/Library/Application Support/My Shared Claude/claude-session-sharing.py` — stable installed helper.
+- `~/Library/Application Support/My Shared Claude/autosync-status.json` — last observed state/error.
+- `~/Library/Application Support/My Shared Claude/autosync.log` and `autosync-error.log` — local logs.
+
+The session store also contains `.my-shared-claude-operation.lock`; it coordinates writers and is released by the OS when a process exits. A leftover lock filename does not itself mean a sync is running. Existing session and backup files remain private local data. Never commit them to this repository.
 
 ## Commands for maintainers
 
@@ -240,6 +280,11 @@ python3 claude-session-sharing.py setup
 # Read-only status.
 python3 claude-session-sharing.py status
 
+# Optional macOS automatic sync: install/update, inspect, or disable.
+python3 claude-session-sharing.py auto-install
+python3 claude-session-sharing.py auto-status
+python3 claude-session-sharing.py auto-remove
+
 # Restore the last pre-sync snapshots, preserving current files first.
 python3 claude-session-sharing.py undo
 
@@ -253,7 +298,7 @@ python3 claude-session-sharing.py recover --transcript "/path/to/first-uuid.json
 python3 claude-session-sharing.py sync --data-dir "/path/to/Claude"
 ```
 
-Direct `sync`, `setup`, `recover`, and `undo` commands apply changes immediately. The launcher adds a preview and typed confirmation. Recovery uses explicit transcript paths; it does not scan and silently import all CLI conversations.
+Direct `sync`, `setup`, `recover`, and `undo` commands apply changes immediately. The launcher adds a preview and typed confirmation for manual sync and undo. Enabling the Mac watcher authorizes future quit-triggered syncs without another prompt. Recovery uses explicit transcript paths; it does not scan and silently import all CLI conversations.
 
 ```bash
 git clone git@github.com:gtarun/My-Shared-Claude.git
@@ -263,6 +308,6 @@ bash -n "Claude Session Sharing.sh"
 zsh -n "Claude Session Sharing.command"
 ```
 
-Tests use temporary data and cover normal-directory persistence, the Unix no-follow directory check, legacy-link migration, newer native writes, account-bound metadata handling, explicit transcript recovery, interrupted sync, undo preservation, platform discovery, process guards, and native launcher startup. GitHub Actions runs them on all three platforms. Windows junction creation is used only in test fixtures to reproduce and remove the old layout; the production helper never creates links.
+Tests use temporary data and cover normal-directory persistence, the Unix no-follow directory check, legacy-link migration, newer native writes, account-bound metadata handling, explicit transcript recovery, interrupted sync, undo preservation, platform discovery, process guards, native launcher startup, quit/quiet-period detection, fast-reopen deferral, change detection, and exclusive writer locks. GitHub Actions runs them on all three platforms. Windows junction creation is used only in test fixtures to reproduce and remove the old layout; the production helper never creates links.
 
 For Claude’s own settings and features, see the [official Desktop documentation](https://code.claude.com/docs/en/desktop).

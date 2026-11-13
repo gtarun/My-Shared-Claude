@@ -24,13 +24,26 @@ QUICK STEPS
 
 BEFORE EVERY ACCOUNT SWITCH
 Finish work > quit Claude > run Sync > reopen Claude > switch accounts.
-New conversations are NOT copied automatically while the app is running.
+New conversations are NOT copied while the app is running.
+
+OPTIONAL: AUTOMATIC SYNC ON MAC
+Choose option 5 once to enable sync after fully quitting Claude.
+Then: finish work > quit Claude > leave it closed about 5-10 seconds > reopen
+and switch accounts. You do not need to run Sync manually after a successful
+automatic run. If you reopen before five seconds pass, copying is deferred
+until a later full quit. Switching accounts inside an open app does not sync.
+Option 6 shows status/errors. Option 7 disables the watcher.
+It starts at future Mac logins, skips unchanged records, and uses the same
+backups and normal folders. Re-run option 5 after updating the helper.
+Disable it before Undo if you want future quits to stop copying.
+Windows and Linux remain manual.
 This is local copying between your OWN accounts on one computer, not sync
 between teammates, computers, or Claude cloud accounts.
 
 REQUIREMENTS
 Python 3.9+. The launcher checks for Python; install from python.org or ask IT
-if missing. Keep the helper and launchers together. No extra Python packages.
+if missing. Keep the helper and launchers together. No extra Python packages. The optional Mac watcher installs a user-level
+LaunchAgent and stable helper copy; it does not download code.
 Use your normal user account; do not run as administrator or with sudo.
 If scripts are blocked by your company, ask IT. Do not disable protections.
 
@@ -39,7 +52,8 @@ Option 2 reports normal folders, legacy links, and the last sync status.
 Option 3 restores the last pre-sync account snapshots. Type UNDO to confirm.
 Current files are backed up again before restoring, so later records remain
 preserved there. Undo never restores account-folder links. Original transcript
-contents are not changed. If interrupted, keep Claude closed and run Undo.
+contents are not changed. If interrupted, keep Claude closed and run Undo. Disable auto sync first
+if you want subsequent quits to stop copying.
 
 LIMITS
 All detected account folders in the selected native Desktop store are included.

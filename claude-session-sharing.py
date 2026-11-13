@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Synchronize local Claude Desktop Code records while the app is closed; never link account folders."""
 import argparse
+import contextlib
+import hashlib
+import plistlib
+import signal
+import time
 import csv
 import datetime
 import json
@@ -118,7 +123,7 @@ def clean(record):
     return result
 
 
-def require_closed():
+def claude_running():
     if sys.platform == 'win32':
         result = subprocess.run(['tasklist.exe', '/FI', 'IMAGENAME eq Claude.exe', '/FO', 'CSV', '/NH'], capture_output=True, text=True)
         if result.returncode != 0:
@@ -130,7 +135,11 @@ def require_closed():
         if result.returncode not in (0, 1):
             raise SystemExit('Could not check whether Claude is running. No changes made.')
         running = result.returncode == 0
-    if running:
+    return running
+
+
+def require_closed():
+    if claude_running():
         raise SystemExit('Quit Claude completely using its Quit/Exit menu (Cmd+Q on Mac), then try again. On Windows, also quit the tray icon. Close Claude CLI processes too if this check still blocks setup.')
 
 
@@ -172,7 +181,7 @@ def plan():
     print(f'Found {len(found)} account/organization folders and {len(chosen)} distinct session records.')
     print(f'Legacy linked folders to repair: {sum(is_link(p) for p in found)}')
     print('Sync copies records into NORMAL account folders. No links are created.')
-    print('Run sync with Claude fully closed before switching accounts; this is not automatic live sharing.')
+    print('Sync runs only with Claude fully closed. The optional Mac watcher can trigger it after quit; in-app switching alone does not sync.')
     print('Each run backs up the account folders and archive. Logins and cloud data stay separate.')
     print('Preview only: no files changed.')
 
@@ -222,7 +231,7 @@ def portable_equal(first, second):
     return clean(first) == clean(second)
 
 
-def sync_records(extra=None, transcripts=None):
+def _sync_records(extra=None, transcripts=None):
     require_closed()
     found, chosen = preflight()
     for record, modified in extra or []:
@@ -234,7 +243,6 @@ def sync_records(extra=None, transcripts=None):
         shutil.copy2(source, destination)
         destination.chmod(0o600)
     state = {'mode': 'offline-copy-v2', 'phase': 'pending', 'last_backup': backup.name}
-    save(STATE, state)
     stages = []
     for folder in found:
         stage = folder.parent / ('.session-sync-' + uuid.uuid4().hex)
@@ -248,7 +256,13 @@ def sync_records(extra=None, transcripts=None):
             save(destination, clean(record))
             os.utime(destination, ns=(modified, modified))
         stages.append((folder, stage))
-    require_closed()
+    try:
+        require_closed()
+    except BaseException:
+        for _, stage in stages:
+            shutil.rmtree(stage)
+        raise
+    save(STATE, state)
     for folder, stage in stages:
         replace_folder(folder, stage, backup / 'replaced' / relative_folder(folder))
     SHARED.mkdir(mode=0o700, exist_ok=True)
@@ -256,11 +270,11 @@ def sync_records(extra=None, transcripts=None):
         destination = SHARED / name
         save(destination, clean(record))
         os.utime(destination, ns=(modified, modified))
-    state.update(phase='complete', folders=entries, synced_at=datetime.datetime.now().isoformat())
+    state.update(phase='complete', folders=entries, synced_at=datetime.datetime.now().isoformat(), snapshot_signature=session_signature())
     save(STATE, state)
     print(f'Synced {len(chosen)} records into {len(found)} normal account/organization folders.')
     print('Backup: ' + str(backup))
-    print('Reopen Claude. Quit and run Sync again before the next account switch.')
+    print('Reopen Claude after sync finishes. Future switches need a sync after quit, manually or via the optional Mac watcher.')
 
 
 def setup():
@@ -276,7 +290,7 @@ def status():
     linked = sum(is_link(p) for p in found)
     print(f'Account/organization folders: {len(found)}; normal: {len(found) - linked}; legacy linked: {linked}')
     print(f'Archive records: {len(list(SHARED.glob("local_*.json")))}')
-    print('Legacy links can prevent Claude from saving. Run Sync/repair while Claude is closed.' if linked else 'Offline copy sync: run Sync while Claude is closed before switching accounts.')
+    print('Legacy links can prevent Claude from saving. Run Sync/repair while Claude is closed.' if linked else 'Offline copy sync: use the Mac quit watcher or run Sync manually with Claude closed.')
     if STATE.exists():
         state = json.loads(STATE.read_text(encoding='utf-8'))
         if state.get('mode') == 'offline-copy-v2':
@@ -285,7 +299,7 @@ def status():
     print('Authentication storage and account-hosted data are not synchronized.')
 
 
-def undo():
+def _undo():
     require_closed()
     if not STATE.exists():
         raise SystemExit('No sync journal found.')
@@ -368,7 +382,7 @@ def transcript_record(path):
     return record
 
 
-def recover_transcripts(paths):
+def _recover_transcripts(paths):
     require_closed()
     _, chosen = preflight()
     known = {record.get('cliSessionId') for _, record, _ in chosen.values()}
@@ -384,22 +398,248 @@ def recover_transcripts(paths):
         sources.append(path)
         known.add(path.stem)
     if recovered:
-        sync_records(recovered, sources)
+        _sync_records(recovered, sources)
         print(f'Rebuilt {len(recovered)} missing sidebar entries from existing transcripts; no messages were changed.')
     else:
         print('No missing session entries to recover.')
 
 
+class SyncBusyError(RuntimeError):
+    pass
+
+
+@contextlib.contextmanager
+def operation_lock():
+    if not BASE.is_dir():
+        raise SystemExit('Claude data folder was not found. Open Code in each account first.')
+    path = BASE / '.my-shared-claude-operation.lock'
+    with path.open('a+b') as handle:
+        path.chmod(0o600)
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b'0')
+            handle.flush()
+        handle.seek(0)
+        try:
+            if os.name == 'nt':
+                import msvcrt
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as error:
+            raise SyncBusyError('Another sync or recovery operation is already running; try again shortly.') from error
+        try:
+            yield
+        finally:
+            if os.name == 'nt':
+                import msvcrt
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def session_signature():
+    values = []
+    for folder in sorted(folders()):
+        values.append((relative_folder(folder), 'linked' if is_link(folder) else 'normal'))
+        for path in sorted(folder.glob('local_*.json')):
+            info = path.stat()
+            values.append((relative_folder(folder), path.name, info.st_size, info.st_mtime_ns))
+    return hashlib.sha256(json.dumps(values).encode('utf-8')).hexdigest()
+
+
+def sync_records(extra=None, transcripts=None):
+    with operation_lock():
+        return _sync_records(extra, transcripts)
+
+
+def undo():
+    with operation_lock():
+        return _undo()
+
+
+def recover_transcripts(paths):
+    with operation_lock():
+        return _recover_transcripts(paths)
+
+
+def sync_if_needed():
+    with operation_lock():
+        require_closed()
+        preflight()
+        state = json.loads(STATE.read_text(encoding='utf-8')) if STATE.exists() else {}
+        if state.get('snapshot_signature') == session_signature():
+            return False
+        _sync_records()
+        return True
+
+
+class ExitWatcher:
+    def __init__(self, settle_seconds=5, retry_seconds=30):
+        self.settle_seconds = settle_seconds
+        self.retry_seconds = retry_seconds
+        self.pending = True
+        self.closed_since = None
+        self.retry_at = 0
+
+    def observe(self, running, now):
+        if running:
+            self.pending = True
+            self.closed_since = None
+            self.retry_at = 0
+            return 'running'
+        if not self.pending:
+            return 'idle'
+        if self.closed_since is None:
+            self.closed_since = now
+        if now - self.closed_since < self.settle_seconds:
+            return 'settling'
+        return 'retry' if now < self.retry_at else 'sync'
+
+    def complete(self, success, now):
+        if success:
+            self.pending = False
+        else:
+            self.retry_at = now + self.retry_seconds
+
+
+AUTO_LABEL = 'com.mysharedclaude.autosync'
+
+
+def auto_paths():
+    runtime = Path.home() / 'Library/Application Support/My Shared Claude'
+    plist = Path.home() / 'Library/LaunchAgents' / (AUTO_LABEL + '.plist')
+    return runtime, plist
+
+
+def mac_only():
+    if sys.platform != 'darwin':
+        raise SystemExit('Automatic quit-triggered sync is currently available on macOS only. Use manual Sync on Windows/Linux.')
+
+
+def install_autosync():
+    mac_only()
+    preflight()
+    with operation_lock():
+        runtime, plist = auto_paths()
+        runtime.mkdir(parents=True, exist_ok=True, mode=0o700)
+        runtime.chmod(0o700)
+        plist.parent.mkdir(parents=True, exist_ok=True)
+        if plist.exists():
+            existing = plistlib.loads(plist.read_bytes())
+            if existing.get('Label') != AUTO_LABEL:
+                raise SystemExit('An unrelated LaunchAgent uses this filename. No service replaced.')
+        domain = 'gui/' + str(os.getuid())
+        # Our watcher handles termination by finishing any in-flight sync first.
+        subprocess.run(['launchctl', 'bootout', domain + '/' + AUTO_LABEL], capture_output=True, text=True)
+        installed = runtime / 'claude-session-sharing.py'
+        if Path(__file__).resolve() != installed.resolve():
+            temporary = installed.with_suffix('.new')
+            shutil.copy2(Path(__file__), temporary)
+            temporary.chmod(0o700)
+            os.replace(temporary, installed)
+        spec = {
+            'Label': AUTO_LABEL,
+            'ProgramArguments': [sys.executable, '-u', str(installed), 'watch', '--data-dir', str(BASE.resolve())],
+            'RunAtLoad': True, 'KeepAlive': True, 'ThrottleInterval': 10,
+            'ProcessType': 'Background', 'ExitTimeOut': 30,
+            'StandardOutPath': str(runtime / 'autosync.log'),
+            'StandardErrorPath': str(runtime / 'autosync-error.log'),
+        }
+        plist.write_bytes(plistlib.dumps(spec))
+        plist.chmod(0o600)
+        for name in ['autosync.log', 'autosync-error.log']:
+            log = runtime / name
+            log.touch(exist_ok=True)
+            log.chmod(0o600)
+        result = subprocess.run(['launchctl', 'bootstrap', domain, str(plist)], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise OSError('Could not start the automatic sync agent: ' + result.stderr.strip())
+    print('Automatic sync enabled for this Mac user and future logins.')
+    print('Fully quit Claude, leave it closed about 5-10 seconds, then reopen and switch accounts.')
+    print('Switching accounts without quitting does not trigger sync. Fast reopening defers it until a later quit.')
+    print('Logs and status: ' + str(runtime))
+
+
+def autosync_status():
+    mac_only()
+    runtime, plist = auto_paths()
+    result = subprocess.run(['launchctl', 'print', 'gui/' + str(os.getuid()) + '/' + AUTO_LABEL], capture_output=True, text=True)
+    print('Automatic sync agent: ' + ('loaded' if result.returncode == 0 else 'not loaded'))
+    print('Login configuration: ' + ('installed' if plist.exists() else 'not installed'))
+    path = runtime / 'autosync-status.json'
+    if path.exists():
+        state = json.loads(path.read_text(encoding='utf-8'))
+        for key in ['status', 'updated_at', 'last_sync', 'last_error']:
+            if state.get(key):
+                print(key.replace('_', ' ').capitalize() + ': ' + str(state[key]))
+    print('Log: ' + str(runtime / 'autosync.log'))
+
+
+def remove_autosync():
+    mac_only()
+    runtime, plist = auto_paths()
+    subprocess.run(['launchctl', 'bootout', 'gui/' + str(os.getuid()) + '/' + AUTO_LABEL], capture_output=True, text=True)
+    if plist.exists():
+        existing = plistlib.loads(plist.read_bytes())
+        if existing.get('Label') != AUTO_LABEL:
+            raise SystemExit('Unrecognized agent file; not removed.')
+        plist.unlink()
+    print('Automatic sync disabled. Session folders, transcripts, backups, and logs were retained.')
+
+
+def watch_forever():
+    mac_only()
+    runtime, _ = auto_paths()
+    runtime.mkdir(parents=True, exist_ok=True, mode=0o700)
+    watcher = ExitWatcher()
+    status_file = runtime / 'autosync-status.json'
+    stopped = [False]
+    signal.signal(signal.SIGTERM, lambda *_: stopped.__setitem__(0, True))
+    signal.signal(signal.SIGINT, lambda *_: stopped.__setitem__(0, True))
+    last = {}
+    print('Watching Claude; sync after five seconds fully closed.', flush=True)
+    while not stopped[0]:
+        try:
+            action = watcher.observe(claude_running(), time.monotonic())
+            message = {'status': {'running': 'waiting for Claude to quit', 'settling': 'waiting for five seconds fully closed', 'idle': 'up to date; waiting for next quit', 'retry': 'sync deferred; retrying after backoff', 'sync': 'syncing'}.get(action, action)}
+            if action == 'sync':
+                changed = sync_if_needed()
+                watcher.complete(True, time.monotonic())
+                message['status'] = 'sync completed' if changed else 'records already up to date'
+                if STATE.exists():
+                    message['last_sync'] = json.loads(STATE.read_text(encoding='utf-8')).get('synced_at')
+                print(message['status'], flush=True)
+            if message['status'] in ('up to date; waiting for next quit', 'waiting for Claude to quit') and last.get('last_sync'):
+                message['last_sync'] = last['last_sync']
+        except (OSError, ValueError, SyncBusyError, SystemExit) as error:
+            watcher.complete(False, time.monotonic())
+            message = {'status': 'sync deferred or failed', 'last_error': str(error)}
+        if last.get('last_error') and 'last_error' not in message and message['status'] not in ('sync completed', 'records already up to date'):
+            message['last_error'] = last['last_error']
+        if last.get('last_sync') and not message.get('last_sync'):
+            message['last_sync'] = last['last_sync']
+        if message != last:
+            save(status_file, dict(message, updated_at=datetime.datetime.now().isoformat()))
+            if message.get('last_error'):
+                print(message['last_error'], flush=True)
+            last = message
+        time.sleep(1)
+
+
 def menu():
     print('Claude Desktop - Offline Code Session Sync\n')
-    print('1. Sync / repair old setup (default)\n2. Check status\n3. Undo last sync\n4. Exit\n')
-    choice = input('Choose 1-4, then press Enter: ').strip() or '1'
+    print('1. Sync / repair old setup (default)\n2. Check status\n3. Undo last sync\n4. Exit\n5. Enable automatic sync on quit (Mac)\n6. Automatic sync status (Mac)\n7. Disable automatic sync (Mac)\n')
+    choice = input('Choose 1-7, then press Enter: ').strip() or '1'
     if choice == '4':
         return
     try:
         if choice == '1':
             plan()
-            print('\nFinish tasks and quit Claude completely. Sync is required again before future account switches.')
+            print('\nFinish tasks and quit Claude completely. Future switches need a completed sync, manually or via the Mac quit watcher.')
             if input('Type SYNC to apply, or press Enter to cancel: ').strip() == 'SYNC':
                 setup()
             else:
@@ -410,15 +650,21 @@ def menu():
             print('Quit Claude first. Undo preserves current data in another backup; it never restores folder links.')
             if input('Type UNDO to restore the last pre-sync snapshot: ').strip() == 'UNDO':
                 undo()
+        elif choice == '5':
+            install_autosync()
+        elif choice == '6':
+            autosync_status()
+        elif choice == '7':
+            remove_autosync()
         else:
-            print('Unknown option. Choose 1-4 next time.')
+            print('Unknown option. Choose 1-7 next time.')
     finally:
         input('\nPress Enter to close.')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['plan', 'sync', 'setup', 'status', 'undo', 'menu', 'recover'])
+    parser.add_argument('command', choices=['plan', 'sync', 'setup', 'status', 'undo', 'menu', 'recover', 'auto-install', 'auto-status', 'auto-remove', 'watch'])
     parser.add_argument('--data-dir', help='Claude data directory containing claude-code-sessions; useful for custom installs or multiple stores')
     parser.add_argument('--transcript', action='append', default=[], help='Explicit .jsonl file to recover; repeat for multiple files')
     args = parser.parse_args()
@@ -429,8 +675,8 @@ if __name__ == '__main__':
         ROOT = BASE / 'claude-code-sessions'
         SHARED = BASE / 'shared-code-sessions'
         STATE = BASE / 'codex-session-sharing.json'
-        {'plan': plan, 'sync': setup, 'setup': setup, 'status': status, 'undo': undo, 'menu': menu, 'recover': lambda: recover_transcripts(args.transcript)}[args.command]()
-    except (OSError, ValueError) as error:
+        {'plan': plan, 'sync': setup, 'setup': setup, 'status': status, 'undo': undo, 'menu': menu, 'recover': lambda: recover_transcripts(args.transcript), 'auto-install': install_autosync, 'auto-status': autosync_status, 'auto-remove': remove_autosync, 'watch': watch_forever}[args.command]()
+    except (OSError, ValueError, SyncBusyError) as error:
         print(f'Could not complete {args.command}: {error}', file=sys.stderr)
         print('Original session folders are retained. If setup was interrupted, keep Claude closed and choose Undo in the launcher.', file=sys.stderr)
         sys.exit(1)
