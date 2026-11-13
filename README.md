@@ -39,7 +39,7 @@ You need a native Claude Desktop installation on macOS, Windows, or Linux, plus 
 
 Only combine conversation histories that you intend to make available under all included accounts and organizations. Continuing an imported conversation uses the active account’s service, subscription, models, and organization settings.
 
-Compatibility depends on Claude’s storage layout. Automated checks cover native Windows, macOS, and Ubuntu filesystem operations, migration, copying, recovery, and undo, with Python 3.9 and 3.12. Those tests do not substitute for checking actual Claude Desktop loading and saving after app updates. The reported failure was investigated against macOS Desktop **5.1231.2**; the old 4.4212.0 read-only check was insufficient to establish save compatibility.
+Compatibility depends on Claude’s storage layout. Automated checks cover native Windows, macOS, and Ubuntu 24.04 filesystem operations, migration, copying, recovery, and undo, with Python 3.9 and 3.12. Those tests do not substitute for checking actual Claude Desktop loading and saving after app updates. The reported failure was investigated against macOS Desktop **5.1231.2**; the old 4.4212.0 read-only check was insufficient to establish save compatibility.
 
 ## What is copied?
 
